@@ -1,4 +1,10 @@
-﻿namespace StyleCop.Analyzers.ReadabilityRules
+﻿using System.Collections.Generic;
+using System.Linq;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using StyleCop.Analyzers.MaintainabilityRules;
+
+namespace StyleCop.Analyzers.ReadabilityRules
 {
     using System.Collections.Immutable;
     using Microsoft.CodeAnalysis;
@@ -27,9 +33,16 @@
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class SA1101PrefixLocalCallsWithThis : DiagnosticAnalyzer
     {
+        private SymbolKind[] supportedSymbolKinds = new[]
+        {
+            SymbolKind.Field,
+            SymbolKind.Method,
+            SymbolKind.Property,
+            SymbolKind.Event
+        };
         public const string DiagnosticId = "SA1101";
         internal const string Title = "Prefix local calls with this";
-        internal const string MessageFormat = "TODO: Message format";
+        internal const string MessageFormat = "A call to an instance member of the local class or a base class is not prefixed with 'this.'";
         internal const string Category = "StyleCop.CSharp.ReadabilityRules";
         internal const string Description = "A call to an instance member of the local class or a base class is not prefixed with 'this.', within a C# code file.";
         internal const string HelpLink = "http://www.stylecop.com/docs/SA1101.html";
@@ -52,7 +65,62 @@
         /// <inheritdoc/>
         public override void Initialize(AnalysisContext context)
         {
-            // TODO: Implement analysis
+            context.RegisterSyntaxNodeAction(AnalyzeIdentifierName,SyntaxKind.IdentifierName);
+        }
+
+        private void AnalyzeIdentifierName(SyntaxNodeAnalysisContext context)
+        {
+            var identifierSynax = (IdentifierNameSyntax) context.Node;
+            if (identifierSynax.IsVar)
+            {
+                return;
+            }
+
+            var symbolInfo = context.SemanticModel.GetSymbolInfo(identifierSynax);
+            if (symbolInfo.Symbol == null || symbolInfo.Symbol.IsStatic)
+            {
+                return;
+            }
+
+            if (!IsParentAClass(symbolInfo.Symbol))
+            {
+                return;
+            }
+
+            if (!supportedSymbolKinds.Any(sk => sk == symbolInfo.Symbol.Kind))
+            {
+                return;
+            }
+
+            if (!HasThis(identifierSynax) && !HasBase(identifierSynax))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(Descriptor, identifierSynax.GetLocation()));
+            }
+        }
+
+        private bool IsParentAClass(ISymbol fieldDeclarationSyntax)
+        {
+            if (fieldDeclarationSyntax.ContainingSymbol != null &&
+                fieldDeclarationSyntax.ContainingSymbol.Kind == SymbolKind.NamedType)
+            {
+                return ((ITypeSymbol)fieldDeclarationSyntax.ContainingSymbol).TypeKind == TypeKind.Class;
+            }
+
+            return false;
+        }
+
+        private bool HasBase(IdentifierNameSyntax identifierSynax)
+        {
+            var parent = identifierSynax.Parent;
+            var descendantNodes = parent.DescendantNodes();
+            return descendantNodes.Any(d => d.CSharpKind() == SyntaxKind.BaseExpression);
+        }
+
+        private bool HasThis(IdentifierNameSyntax identifierSynax)
+        {
+            var parent = identifierSynax.Parent;
+            var descendantNodes = parent.DescendantNodes();
+            return descendantNodes.Any(d => d.CSharpKind() == SyntaxKind.ThisExpression);
         }
     }
 }
