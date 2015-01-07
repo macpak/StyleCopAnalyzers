@@ -69,21 +69,10 @@ namespace StyleCop.Analyzers.ReadabilityRules
         private void HandleElementAccessExpression(SyntaxNodeAnalysisContext context)
         {
             var symbol = context.SemanticModel.GetSymbolInfo(((ElementAccessExpressionSyntax) context.Node).Expression).Symbol;
-            var declaredSymbol = context.SemanticModel.GetDeclaredSymbol(((ElementAccessExpressionSyntax)context.Node).Expression);
-            var localSymbol = symbol as ILocalSymbol;
             var parameterSymbol = symbol as IParameterSymbol;
-            var fieldSymbol = symbol as IFieldSymbol;
-            var propertySymbol = symbol as IPropertySymbol;
-            var methodSymbol = symbol as IMethodSymbol;
 
-            var i = context.SemanticModel.GetIndexerGroup(((ElementAccessExpressionSyntax) context.Node).Expression);
 
-            //TODO: if it's indexer should be moved as a extension/helper
-            if ((localSymbol != null && localSymbol.Type.TypeKind != TypeKind.Array) ||
-                (fieldSymbol != null && fieldSymbol.Type.TypeKind != TypeKind.Array) ||
-                (propertySymbol != null && propertySymbol.Type.TypeKind != TypeKind.Array) ||
-                (methodSymbol != null && methodSymbol.ReturnType.TypeKind != TypeKind.Array) ||
-                (parameterSymbol != null && (parameterSymbol.IsThis || parameterSymbol.Type.TypeKind != TypeKind.Array)))
+            if (parameterSymbol != null && parameterSymbol.IsThis)
             {
 
                 var elementAccess = (ElementAccessExpressionSyntax)context.Node;
